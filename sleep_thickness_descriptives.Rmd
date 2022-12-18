@@ -1,0 +1,265 @@
+---
+title: "Sleep and Cortical Thickness: Descriptives"
+author: "Narlon Cassio"
+date: "June 18, 2022"
+output: 
+  pdf_document: 
+    toc: yes
+    number_sections: yes
+    toc_depth: 5
+  word_document: 
+    toc: yes
+    toc_depth: 5
+geometry: "left = 1cm, right = 1cm, top = 1cm, bottom = 2.5cm"
+header-includes:
+- \usepackage{caption}
+- \usepackage{pdflscape}
+- \newcommand{\blandscape}{\begin{landscape}}
+- \newcommand{\elandscape}{\end{landscape}}
+editor_options: 
+  chunk_output_type: console
+---
+
+\newpage
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  fig.height = 4, fig.width = 5, fig.align="center"
+)
+```
+
+\small
+
+# Loading packages
+
+```{r, }
+#------------------------------------------------------------------#
+# Loading packages                                              ####
+#------------------------------------------------------------------#
+library(tidyverse)
+library(openxlsx)
+library(broom)
+library(psych)
+library(knitr)
+library(rstatix)
+library(tableone)
+```
+
+# Loading data
+
+```{r, message = FALSE}
+#------------------------------------------------------------------#
+# Loading data                                                  ####
+#------------------------------------------------------------------#
+# Outcome and descriptive data
+all_data_clean <- read.xlsx("all_data_clean.xlsx")
+
+all_data_clean_included <- all_data_clean %>% 
+  filter(included=="YES")
+
+```
+
+# Data management
+
+## Checking data --- Included subjects only
+
+### Demographics
+
+```{r, fig.height=8, fig.width=6}
+# Checking variables
+## Continous demographics data
+all_data_clean %>% select("age","moca","mmse","height","weight","bmi", "psqi_total_score") %>% 
+  describe(IQR = TRUE, fast = TRUE) %>% 
+  kable(digits = 3)
+
+    ## Histograms
+    all_data_clean_included %>%
+      select("id", "age", "moca", "mmse", "height", "weight", "bmi", "psqi_total_score") %>%
+      pivot_longer(values_to = "data", names_to = "measures", col = 2:8) %>%
+      ggplot(aes(data, fill = measures)) +
+      geom_histogram(colour = "black", binwidth = function(x) 2 * IQR(x) / (length(x)^(1/3))) +
+      facet_wrap(~measures, scales = "free", ncol = 2)+
+      theme_minimal() +
+      theme(legend.position = "none")
+    
+    ## Normality tests
+    kable(digits = 2, caption = "Normality test", all_data_clean %>% 
+        shapiro_test(age, moca, mmse, height, weight, bmi, psqi_total_score))
+    
+## Categorical demographics data 
+kable(print(printToggle = FALSE, CreateTableOne(data = all_data_clean_included, c("sex", "education", "sleep_medication_psqi")), 
+            missing = TRUE))
+```
+
+### Sleep data
+
+```{r, fig.height=8, fig.width=6}
+# Checking variables
+# Distance, ambulation time, velocity, step count, cadence, double support time
+kable(digits = 3, describe(all_data_clean_included[c("sleep_time_avg",
+                                            "sleep_time_sd",
+                                           "sleep_efficiency_avg",
+                                           "sleep_efficiency_sd",
+                                           "fragmentation_index_avg",
+                                           "fragmentation_index_sd")], IQR = TRUE, fast = TRUE))
+    ## Histograms
+    all_data_clean_included %>%
+      select("sleep_time_avg", "sleep_time_sd",
+             "sleep_efficiency_avg", "sleep_efficiency_sd", 
+             "fragmentation_index_avg", "fragmentation_index_sd") %>%
+      pivot_longer(values_to = "data", names_to = "measures", col = 1:6) %>%
+      ggplot(aes(data, fill = measures)) +
+      geom_histogram(colour = "black", binwidth = function(x) 2 * IQR(x) / (length(x)^(1/3))) +
+      facet_wrap(~measures, scales = "free", ncol = 2)+
+      theme_minimal() +
+      theme(legend.position = "none")
+    
+    ## Normality tests
+    kable(digits = 3, caption = "Normality test", all_data_clean_included %>% 
+        shapiro_test(sleep_time_avg,
+                     sleep_time_sd,
+                     sleep_efficiency_avg,
+                     sleep_efficiency_sd,
+                     fragmentation_index_avg,
+                     fragmentation_index_sd))
+    
+# Transforming non-normal variables
+all_data_clean_included <- all_data_clean_included %>% 
+  mutate(sleep_time_sd_lg = log1p(sleep_time_sd),
+         sleep_efficiency_sd_lg = log1p(sleep_efficiency_sd),
+         fragmentation_index_sd_lg = log1p(fragmentation_index_sd))
+
+    ## Histograms
+    all_data_clean_included %>%
+        select("sleep_time_avg", "sleep_time_sd_lg",
+               "sleep_efficiency_avg", "sleep_efficiency_sd_lg", 
+               "fragmentation_index_avg", "fragmentation_index_sd_lg") %>%
+        pivot_longer(values_to = "data", names_to = "measures", col = 1:6) %>%
+        ggplot(aes(data, fill = measures)) +
+        geom_histogram(colour = "black", binwidth = function(x) 2 * IQR(x) / (length(x)^(1/3))) +
+        facet_wrap(~measures, scales = "free", ncol = 2)+
+        theme_minimal() +
+        theme(legend.position = "none")
+ 
+   ## Normality tests
+    kable(digits = 3, caption = "Normality test", all_data_clean_included %>% 
+        shapiro_test(sleep_time_sd_lg,
+                     sleep_efficiency_sd_lg,
+                     fragmentation_index_sd_lg))
+    
+
+    kable(digits = 3, describe(all_data_clean_included[c("sleep_time_sd_lg", 
+                                                "sleep_efficiency_sd_lg",
+                                                "fragmentation_index_sd_lg")], IQR = TRUE, fast = TRUE))
+    
+```
+
+### Cognition data
+
+```{r, }
+# Checking variables
+kable(digits = 3, describe(all_data_clean_included[c("adas_cog_tot", "tmt_a", "tmt_b", 
+                                            "tmt_bma", "dsst")], IQR = TRUE, fast = TRUE))         
+
+    ## Histograms
+    all_data_clean_included %>%
+      select("adas_cog_tot", "tmt_a", "tmt_b", "tmt_bma", "dsst") %>%
+      pivot_longer(values_to = "data", names_to = "measures", col = 1:5) %>%
+      ggplot(aes(data, fill = measures)) +
+      geom_histogram(colour = "black", binwidth = function(x) 2 * IQR(x) / (length(x)^(1/3))) +
+      facet_wrap(~measures, scales = "free", ncol = 2)+
+      theme_minimal() +
+      theme(legend.position = "none")
+    
+    ## Normality tests
+    kable(digits = 2, caption = "Normality test", all_data_clean_included %>%
+            shapiro_test(adas_cog_tot, tmt_a, tmt_b,
+                         tmt_bma, dsst))
+    
+    boxplot(all_data_clean_included$tmt_a)$out
+    boxplot(all_data_clean_included$tmt_b)$out
+    boxplot(all_data_clean_included$tmt_bma)$out
+    
+# Transforming non-normal variables
+all_data_clean_included <- all_data_clean_included %>% 
+  mutate(tmt_a_lg = log10(tmt_a),
+         tmt_b_lg = log10(tmt_b),
+         tmt_bma_lg = log10(tmt_bma))
+
+    boxplot(all_data_clean_included$tmt_a_lg)$out
+    boxplot(all_data_clean_included$tmt_b_lg)$out
+    boxplot(all_data_clean_included$tmt_bma_lg)$out
+    
+    all_data_clean_included <- all_data_clean_included %>% 
+      mutate(tmt_a_lg = ifelse(tmt_a_lg >= 1.87, NA, tmt_a_lg),
+             tmt_b_lg = ifelse(tmt_b_lg >= 2.47, NA, tmt_b_lg),
+             tmt_bma_lg = ifelse(tmt_bma_lg <= 0.99, NA, tmt_bma_lg),
+             tmt_bma_lg = ifelse(tmt_bma_lg >= 2.57, NA, tmt_bma_lg))
+    
+    boxplot(all_data_clean_included$tmt_a_lg)$out
+    boxplot(all_data_clean_included$tmt_b_lg)$out
+    boxplot(all_data_clean_included$tmt_bma_lg)$out
+    
+    ## Normality tests
+    kable(digits = 2, caption = "Normality test", all_data_clean_included %>%
+            shapiro_test(tmt_a_lg, tmt_b_lg, tmt_bma_lg))
+    
+```
+
+```{r, }
+# Saving final dataset
+write.xlsx(all_data_clean_included, "all_data_clean_final.xlsx")
+```
+
+# Comparing included vs excluded
+
+```{r }
+
+# Checking observations
+kable(all_data_clean %>% 
+  mutate(cohort = str_replace_all(id, c("FACTORIAL_..." = "FACT",
+                                        "RVCI_..." = "RVCI",
+                                        "BT_..." = "BT"))) %>% 
+  group_by(cohort) %>%
+  count() %>% 
+  ungroup(), caption = "Number of subjects with sleep data available across corhots")
+
+## ADAS-Cog
+kable(all_data_clean %>% 
+        filter(is.na(adas_cog_tot)==FALSE) %>% 
+        group_by(included) %>% 
+        count() %>%
+        ungroup())
+ 
+## TMT BmA data
+kable(all_data_clean %>% 
+        filter(is.na(tmt_bma)==FALSE) %>% 
+        group_by(included) %>% 
+        count() %>% 
+        ungroup())
+
+## DSST data
+kable(all_data_clean %>% 
+        filter(is.na(dsst)==FALSE) %>% 
+        group_by(included) %>% 
+        count() %>% 
+        ungroup())
+
+# Demographic information
+kable(print(printToggle = FALSE, CreateTableOne(data = all_data_clean, 
+                                                c("age", "sex", "psqi_total_score", "sleep_medication_psqi","sleep_dist_psqi", "height", "weight", 
+                                                  "bmi","education", "moca", "mmse", 
+                                                  "adas_cog_tot", "tmt_a", "tmt_b", "tmt_bma", "dsst"), 
+                           strata = "included", includeNA = TRUE, addOverall = TRUE), 
+            nonnormal = c("bmi","moca", "mmse", "tmt_a", "tmt_b", "tmt_bma")), caption = "Demographic data: Comparing included vs excluded")
+
+# Predictor data
+kable(print(printToggle = FALSE, CreateTableOne(data = all_data_clean, c("sleep_time_avg", "sleep_time_sd", 
+                                                    "sleep_efficiency_avg", "sleep_efficiency_sd", 
+                                                    "fragmentation_index_avg", "fragmentation_index_sd"), 
+                           strata = "included", includeNA = TRUE, addOverall = TRUE), 
+      nonnormal = c("sleep_time_sd","sleep_efficiency_sd", "fragmentation_index_sd")), 
+      caption = "Predictor data: Comparing included vs excluded")
+
+```
